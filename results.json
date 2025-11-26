@@ -1,0 +1,66 @@
+{
+  "search_params": {
+    "author": "joko siswantoro",
+    "keyword": " ",
+    "max_results": 5,
+    "timestamp": "2025-11-26 15:07:11"
+  },
+  "total_found": 5,
+  "results": [
+    {
+      "no": 1,
+      "title": "Evaluation of the engine performance and exhaust emissions of biodiesel-bioethanol-diesel blends using kernel-based extreme learning machine",
+      "authors": "AS Silitonga, HH Masjuki, HC Ong, AH Sebayang, S Dharma, F Kusumo, ...",
+      "journal": "Energy 159, 1075-1087",
+      "year": "2018",
+      "publish_date": "2018/9/15",
+      "citations": "315",
+      "link": "https://www.academia.edu/download/56955074/Evaluation_of_the_engine_performance_and_emission_K-ELM_Silitonga.pdf",
+      "keyword_match": "No"
+    },
+    {
+      "no": 2,
+      "title": "Biodiesel synthesis from Ceiba pentandra oil by microwave irradiation-assisted transesterification: ELM modeling and optimization",
+      "authors": "AS Silitonga, AH Shamsuddin, TMI Mahlia, J Milano, F Kusumo, ...",
+      "journal": "Renewable Energy 146, 1278-1291",
+      "year": "2020",
+      "publish_date": "2020/2/1",
+      "citations": "270",
+      "link": "https://www.sciencedirect.com/science/article/pii/S0960148119310857",
+      "keyword_match": "No"
+    },
+    {
+      "no": 3,
+      "title": "Biodiesel production from Calophyllum inophyllum-Ceiba pentandra oil mixture: Optimization and characterization",
+      "authors": "HC Ong, J Milano, AS Silitonga, MH Hassan, AH Shamsuddin, CT Wang, ...",
+      "journal": "Journal of Cleaner Production 219, 183-198",
+      "year": "2019",
+      "publish_date": "2019/5/10",
+      "citations": "256",
+      "link": "http://repository.ubaya.ac.id/40907/5/Joko%20Siswantoro_Biodiesel%20production%20from%20Calophyllum%20inophyllum-Ceiba%20pentandra%20oil%20mixture%20Optimization%20and%20characterization.pdf",
+      "keyword_match": "No"
+    },
+    {
+      "no": 4,
+      "title": "An android based course attendance system using face recognition",
+      "authors": "D Sunaryono, J Siswantoro, R Anggoro",
+      "journal": "Journal of King Saud University-Computer and Information Sciences",
+      "year": "2021",
+      "publish_date": "2021/3/24",
+      "citations": "182",
+      "link": "https://www.sciencedirect.com/science/article/pii/S1319157818309406",
+      "keyword_match": "No"
+    },
+    {
+      "no": 5,
+      "title": "Optimization of transesterification process for Ceiba pentandra oil: A comparative study between kernel-based extreme learning machine and artificial neural networks",
+      "authors": "F Kusumo, AS Silitonga, HH Masjuki, HC Ong, J Siswantoro, TMI Mahlia",
+      "journal": "Energy 134, 24-34",
+      "year": "2017",
+      "publish_date": "2017/9/1",
+      "citations": "131",
+      "link": "http://repository.ubaya.ac.id/31881/14/Paper%20Energy.pdf",
+      "keyword_match": "No"
+    }
+  ]
+}
