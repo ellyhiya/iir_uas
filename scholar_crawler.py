@@ -18,6 +18,8 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
 from webdriver_manager.chrome import ChromeDriverManager
+from Sastrawi.Stemmer.StemmerFactory import StemmerFactory
+from Sastrawi.StopWordRemover.StopWordRemoverFactory import StopWordRemoverFactory
 
 # Set environment for better encoding support
 os.environ['PYTHONIOENCODING'] = 'utf-8'
@@ -47,7 +49,12 @@ def crawl_google_scholar(author_name, keyword, max_results=5):
     print("="*60)
     print("STEP 1: Initializing Chrome driver...")
     print("="*60)
+    print("[INIT] Initializing Sastrawi Stemmer and Stopword Remover...")
+    factory_stem = StemmerFactory()
+    stemmer = factory_stem.create_stemmer()
     
+    factory_stop = StopWordRemoverFactory()
+    stopword = factory_stop.create_stop_word_remover()
     try:
         # Initialize driver with webdriver-manager
         # Install ChromeDriver and get the correct executable path
@@ -160,8 +167,17 @@ def crawl_google_scholar(author_name, keyword, max_results=5):
                 print("  >>> Getting basic info from profile page...")
                 title_elem = pub.find_element(By.CSS_SELECTOR, "a.gsc_a_at")
                 title = title_elem.text
-                article_link = title_elem.get_attribute('data-href')
+                # 1. Stemming
+                stemmed_title = stemmer.stem(title)
+                # 2. Stopword Removal
+                clean_title = stopword.remove(stemmed_title)
                 
+                print(f"  [PREPROCESS] Original: {title[:30]}...")
+                print(f"  [PREPROCESS] Cleaned : {clean_title[:30]}...")
+                # ==========================================
+
+                article_link = title_elem.get_attribute('data-href')
+
                 # Debug: cek juga href biasa kalau data-href kosong
                 if not article_link:
                     article_link = title_elem.get_attribute('href')
@@ -342,6 +358,7 @@ def crawl_google_scholar(author_name, keyword, max_results=5):
                 result = {
                     'no': count + 1,
                     'title': title,
+                    'clean_title': clean_title,
                     'authors': authors,
                     'journal': journal,
                     'year': year,
