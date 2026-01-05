@@ -20,6 +20,8 @@ from selenium.common.exceptions import TimeoutException, NoSuchElementException
 from webdriver_manager.chrome import ChromeDriverManager
 from Sastrawi.Stemmer.StemmerFactory import StemmerFactory
 from Sastrawi.StopWordRemover.StopWordRemoverFactory import StopWordRemoverFactory
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
 
 # Set environment for better encoding support
 os.environ['PYTHONIOENCODING'] = 'utf-8'
@@ -39,13 +41,16 @@ def crawl_google_scholar(author_name, keyword, max_results=5):
     
     # Setup Chrome options
     chrome_options = Options()
-    chrome_options.add_argument('--headless')  # Run without opening browser window
+    # chrome_options.add_argument('--headless')  # Run without opening browser window
     chrome_options.add_argument('--no-sandbox')
     chrome_options.add_argument('--disable-dev-shm-usage')
     chrome_options.add_argument('--disable-gpu')
     chrome_options.add_argument('--window-size=1920,1080')
     chrome_options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36')
-    
+    chrome_options.add_argument("--disable-blink-features=AutomationControlled")
+    chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
+    chrome_options.add_experimental_option("useAutomationExtension", False)
+
     print("="*60)
     print("STEP 1: Initializing Chrome driver...")
     print("="*60)
@@ -81,6 +86,10 @@ def crawl_google_scholar(author_name, keyword, max_results=5):
             service=Service(chrome_driver_path),
             options=chrome_options
         )
+        driver.execute_script(
+            "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
+        )
+
         print("[OK] Chrome driver initialized successfully")
         
         results = []
@@ -94,8 +103,16 @@ def crawl_google_scholar(author_name, keyword, max_results=5):
         print(f"Search URL: {search_url}")
         
         driver.get(search_url)
-        print("[OK] Page loaded successfully")
         time.sleep(3)
+
+        print("Menunggu sampai hasil Scholar muncul (selesaikan CAPTCHA jika ada)...")
+
+        WebDriverWait(driver, 300).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "div.gs_r"))
+        )
+        print("[OK]")
+
+
         
         # Step 2: Find and click first author profile link
         print("\n" + "="*60)
@@ -111,10 +128,10 @@ def crawl_google_scholar(author_name, keyword, max_results=5):
             print(f"[OK] Found {len(author_links)} profile link(s)")
             
             if not author_links:
-                print("[X] ERROR: No author profile found!")
-                print(f"  Author searched: '{author_name}'")
-                driver.quit()
-                return []
+                print("[WARN] Author profile not found")
+                print("[INFO] Switching to ARTICLE SEARCH MODE")
+                return crawl_without_profile(driver, author_name, keyword, max_results)
+
             
             # Ambil profile link paling atas (pertama)
             author_profile_url = author_links[0].get_attribute('href')
@@ -174,7 +191,16 @@ def crawl_google_scholar(author_name, keyword, max_results=5):
                 
                 print(f"  [PREPROCESS] Original: {title[:30]}...")
                 print(f"  [PREPROCESS] Cleaned : {clean_title[:30]}...")
-                # ==========================================
+
+                # TF-IDF + COSINE SIMILARITY
+                clean_keyword = stopword.remove(stemmer.stem(keyword.lower()))
+
+                similarity_score = compute_tfidf_similarity(
+                    clean_keyword,
+                    clean_title.lower()
+                )
+
+                print(f"  [SIMILARITY] TF-IDF Cosine Score: {similarity_score}")
 
                 article_link = title_elem.get_attribute('data-href')
 
@@ -365,7 +391,8 @@ def crawl_google_scholar(author_name, keyword, max_results=5):
                     'publish_date': publish_date,
                     'citations': citations,
                     'link': full_link,
-                    'keyword_match': 'Yes' if keyword_match else 'No'
+                    'keyword_match': 'Yes' if keyword_match else 'No',
+                    'tfidf_similarity': similarity_score
                 }
                 
                 results.append(result)
@@ -383,7 +410,7 @@ def crawl_google_scholar(author_name, keyword, max_results=5):
         print("="*60)
         print(f"[OK] Total articles extracted: {len(results)}")
         print(f"[OK] Browser closed")
-        
+        results = sorted(results, key=lambda x: x['tfidf_similarity'], reverse=True)
         return results
         
     except Exception as e:
@@ -399,6 +426,93 @@ def crawl_google_scholar(author_name, keyword, max_results=5):
             driver.quit()
             print("[OK] Browser closed")
         return []
+
+def crawl_without_profile(driver, author, keyword, max_results):
+    print("\n" + "="*60)
+    print("ARTICLE SEARCH MODE (NO PROFILE)")
+    print("="*60)
+
+    #QUERY HANYA KEYWORD
+    query = keyword
+    search_url = f"https://scholar.google.com/scholar?hl=en&q={query.replace(' ', '+')}"
+    print(f"[INFO] Search URL: {search_url}")
+
+    driver.get(search_url)
+    time.sleep(3)
+
+    print("Menunggu sampai hasil Scholar muncul ...")
+
+    WebDriverWait(driver, 300).until(
+        EC.presence_of_element_located((By.CSS_SELECTOR, "div.gs_r"))
+    )
+
+    print("[OK]")
+
+    results = []
+
+    #SELECTOR YANG PALING STABIL
+    articles = driver.find_elements(By.CSS_SELECTOR, "div.gs_r")
+
+    print(f"[OK] Found {len(articles)} raw articles")
+
+    count = 0
+    for art in articles:
+        if count >= max_results:
+            break
+
+        try:
+            title = art.find_element(By.CSS_SELECTOR, "h3.gs_rt").text
+            authors = art.find_element(By.CSS_SELECTOR, "div.gs_a").text
+            snippet = art.find_element(By.CSS_SELECTOR, "div.gs_rs").text if art.find_elements(By.CSS_SELECTOR, "div.gs_rs") else ""
+
+            #FILTER AUTHOR DI SINI
+            if author.lower() not in authors.lower():
+                continue
+
+            similarity = compute_tfidf_similarity(
+                keyword.lower(),
+                title.lower()
+            )
+
+            results.append({
+                "no": count + 1,
+                "title": title,
+                "authors": authors,
+                "snippet": snippet,
+                "tfidf_similarity": similarity,
+                "mode": "search_only_filtered"
+            })
+
+            count += 1
+            print(f"[OK] Article {count} | Similarity: {similarity}")
+
+        except Exception as e:
+            print(f"[WARN] Skip article: {str(e)}")
+            continue
+
+    return results
+
+def compute_tfidf_similarity(keyword, document):
+    """
+    Compute TF-IDF cosine similarity between keyword and document
+    
+    Args:
+        keyword (str): search keyword
+        document (str): document text (clean title)
+    
+    Returns:
+        float: similarity score (0 - 1)
+    """
+    try:
+        corpus = [keyword, document]
+        vectorizer = TfidfVectorizer()
+        tfidf_matrix = vectorizer.fit_transform(corpus)
+
+        similarity = cosine_similarity(tfidf_matrix[0:1], tfidf_matrix[1:2])[0][0]
+        return round(float(similarity), 4)
+    except:
+        return 0.0
+
 
 def main():
     """Main function to handle command line arguments"""
