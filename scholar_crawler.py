@@ -20,6 +20,8 @@ from selenium.common.exceptions import TimeoutException, NoSuchElementException
 from webdriver_manager.chrome import ChromeDriverManager
 from Sastrawi.Stemmer.StemmerFactory import StemmerFactory
 from Sastrawi.StopWordRemover.StopWordRemoverFactory import StopWordRemoverFactory
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
 
 # Set environment for better encoding support
 os.environ['PYTHONIOENCODING'] = 'utf-8'
@@ -176,6 +178,14 @@ def crawl_google_scholar(author_name, keyword, max_results=5):
                 print(f"  [PREPROCESS] Cleaned : {clean_title[:30]}...")
                 # ==========================================
 
+                # TF-IDF + COSINE SIMILARITY
+                clean_keyword = stopword.remove(stemmer.stem(keyword.lower()))
+
+                similarity_score = compute_tfidf_similarity(
+                    clean_keyword,
+                    clean_title.lower()
+                )
+                
                 article_link = title_elem.get_attribute('data-href')
 
                 # Debug: cek juga href biasa kalau data-href kosong
@@ -365,7 +375,8 @@ def crawl_google_scholar(author_name, keyword, max_results=5):
                     'publish_date': publish_date,
                     'citations': citations,
                     'link': full_link,
-                    'keyword_match': 'Yes' if keyword_match else 'No'
+                    'keyword_match': 'Yes' if keyword_match else 'No',
+                    'tfidf_similarity': similarity_score
                 }
                 
                 results.append(result)
@@ -383,6 +394,8 @@ def crawl_google_scholar(author_name, keyword, max_results=5):
         print("="*60)
         print(f"[OK] Total articles extracted: {len(results)}")
         print(f"[OK] Browser closed")
+        results = sorted(results, key=lambda x: x['tfidf_similarity'], reverse=True)
+        return results
         
         return results
         
@@ -400,6 +413,27 @@ def crawl_google_scholar(author_name, keyword, max_results=5):
             print("[OK] Browser closed")
         return []
 
+def compute_tfidf_similarity(keyword, document):
+    """
+    Compute TF-IDF cosine similarity between keyword and document
+    
+    Args:
+        keyword (str): search keyword
+        document (str): document text (clean title)
+    
+    Returns:
+        float: similarity score (0 - 1)
+    """
+    try:
+        corpus = [keyword, document]
+        vectorizer = TfidfVectorizer()
+        tfidf_matrix = vectorizer.fit_transform(corpus)
+
+        similarity = cosine_similarity(tfidf_matrix[0:1], tfidf_matrix[1:2])[0][0]
+        return round(float(similarity), 4)
+    except:
+        return 0.0
+    
 def main():
     """Main function to handle command line arguments"""
     

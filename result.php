@@ -145,6 +145,7 @@
                                 <th style="width: 15%;">Nama Jurnal</th>
                                 <th style="width: 8%;">Jumlah Sitasi</th>
                                 <th style="width: 10%;">Link Jurnal</th>
+                                <th style="width: 10%;">Similarity</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -168,6 +169,7 @@
                                             N/A
                                         <?php endif; ?>
                                     </td>
+                                    <td><?= htmlspecialchars($article['tfidf_similarity']) ?></td>
                                 </tr>
                             <?php endforeach; ?>
                         </tbody>
