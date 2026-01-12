@@ -22,6 +22,7 @@ from Sastrawi.Stemmer.StemmerFactory import StemmerFactory
 from Sastrawi.StopWordRemover.StopWordRemoverFactory import StopWordRemoverFactory
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
+from googletrans import Translator
 
 # Set environment for better encoding support
 os.environ['PYTHONIOENCODING'] = 'utf-8'
@@ -57,6 +58,9 @@ def crawl_google_scholar(author_name, keyword, max_results=5):
     
     factory_stop = StopWordRemoverFactory()
     stopword = factory_stop.create_stop_word_remover()
+    
+    print("[INIT] Initializing Google Translator...")
+    translator = Translator()
     try:
         # Initialize driver with webdriver-manager
         # Install ChromeDriver and get the correct executable path
@@ -169,17 +173,36 @@ def crawl_google_scholar(author_name, keyword, max_results=5):
                 print("  >>> Getting basic info from profile page...")
                 title_elem = pub.find_element(By.CSS_SELECTOR, "a.gsc_a_at")
                 title = title_elem.text
-                # 1. Stemming
-                stemmed_title = stemmer.stem(title)
-                # 2. Stopword Removal
+                
+                # PREPROCESSING DENGAN TRANSLASI
+                print(f"  [PREPROCESS] Original: {title[:50]}...")
+                
+                # 1. Translate to Indonesian (untuk Sastrawi)
+                try:
+                    translated_title = translator.translate(title, src='en', dest='id').text
+                    print(f"  [TRANSLATE] ID: {translated_title[:50]}...")
+                except Exception as e:
+                    print(f"  [TRANSLATE] Error: {str(e)}, using original")
+                    translated_title = title
+                
+                # 2. Stemming (Sastrawi - Bahasa Indonesia)
+                stemmed_title = stemmer.stem(translated_title)
+                
+                # 3. Stopword Removal
                 clean_title = stopword.remove(stemmed_title)
                 
-                print(f"  [PREPROCESS] Original: {title[:30]}...")
-                print(f"  [PREPROCESS] Cleaned : {clean_title[:30]}...")
+                print(f"  [PREPROCESS] Cleaned: {clean_title[:50]}...")
                 # ==========================================
 
                 # TF-IDF + COSINE SIMILARITY
-                clean_keyword = stopword.remove(stemmer.stem(keyword.lower()))
+                # Translate keyword juga
+                try:
+                    translated_keyword = translator.translate(keyword, src='en', dest='id').text
+                    print(f"  [TRANSLATE] Keyword ID: {translated_keyword}")
+                except:
+                    translated_keyword = keyword
+                
+                clean_keyword = stopword.remove(stemmer.stem(translated_keyword.lower()))
 
                 similarity_score = compute_tfidf_similarity(
                     clean_keyword,
@@ -416,6 +439,7 @@ def crawl_google_scholar(author_name, keyword, max_results=5):
 def compute_tfidf_similarity(keyword, document):
     """
     Compute TF-IDF cosine similarity between keyword and document
+    Uses n-gram with n=1 (unigram) and n=2 (bigram)
     
     Args:
         keyword (str): search keyword
@@ -425,13 +449,37 @@ def compute_tfidf_similarity(keyword, document):
         float: similarity score (0 - 1)
     """
     try:
+        print(f"  [TF-IDF DEBUG] Keyword: '{keyword}'")
+        print(f"  [TF-IDF DEBUG] Document: '{document}'")
+        
+        # Cek jika string kosong
+        if not keyword.strip() or not document.strip():
+            print("  [TF-IDF DEBUG] WARNING: Empty keyword or document!")
+            return 0.0
+        
         corpus = [keyword, document]
-        vectorizer = TfidfVectorizer()
+        
+        # TfidfVectorizer dengan n-gram (unigram + bigram)
+        vectorizer = TfidfVectorizer(
+            ngram_range=(1, 2),  # n=1 (unigram) dan n=2 (bigram)
+            lowercase=True,
+            token_pattern=r'(?u)\b\w+\b'  # Token pattern untuk memproses kata
+        )
+        print(f"  [TF-IDF DEBUG] Using n-gram: unigram (n=1) + bigram (n=2)")
+        
         tfidf_matrix = vectorizer.fit_transform(corpus)
-
+        
+        # Debug: tampilkan vocabulary dan matrix
+        vocab = vectorizer.get_feature_names_out()
+        print(f"  [TF-IDF DEBUG] Vocabulary ({len(vocab)} terms): {list(vocab)[:10]}{'...' if len(vocab) > 10 else ''}")
+        print(f"  [TF-IDF DEBUG] TF-IDF Matrix shape: {tfidf_matrix.shape}")
+        
         similarity = cosine_similarity(tfidf_matrix[0:1], tfidf_matrix[1:2])[0][0]
+        print(f"  [TF-IDF DEBUG] Similarity score: {similarity}")
+        
         return round(float(similarity), 4)
-    except:
+    except Exception as e:
+        print(f"  [TF-IDF DEBUG] ERROR: {str(e)}")
         return 0.0
     
 def main():
